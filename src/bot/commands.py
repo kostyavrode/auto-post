@@ -72,7 +72,7 @@ async def cmd_add_source(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = " ".join(args[1:]) if len(args) > 1 else url
     src_type = "rss" if _looks_like_rss(url) else "scraper"
 
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.execute(
             "INSERT INTO sources (name, type, url) VALUES (?, ?, ?)",
             (name, src_type, url),
@@ -94,7 +94,7 @@ async def cmd_add_tg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     channel = args[0]
     name = " ".join(args[1:]) if len(args) > 1 else channel
 
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.execute(
             "INSERT INTO sources (name, type, channel) VALUES (?, 'telegram', ?)",
             (name, channel),
@@ -106,7 +106,7 @@ async def cmd_add_tg(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @admin_only
 async def cmd_list_sources(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    async with await get_db() as db:
+    async with get_db() as db:
         async with db.execute("SELECT id, name, type, url, channel, enabled FROM sources") as cur:
             rows = await cur.fetchall()
 
@@ -129,7 +129,7 @@ async def cmd_del_source(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Usage: /del_source <id>")
         return
     source_id = int(context.args[0])
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.execute("DELETE FROM sources WHERE id=?", (source_id,))
         await db.commit()
     await update.message.reply_text(f"Source {source_id} deleted.")
@@ -141,7 +141,7 @@ async def cmd_toggle_source(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Usage: /toggle_source <id>")
         return
     source_id = int(context.args[0])
-    async with await get_db() as db:
+    async with get_db() as db:
         async with db.execute("SELECT enabled FROM sources WHERE id=?", (source_id,)) as cur:
             row = await cur.fetchone()
         if not row:
@@ -234,7 +234,7 @@ async def cmd_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @admin_only
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     enabled = await is_posting_enabled()
-    async with await get_db() as db:
+    async with get_db() as db:
         async with db.execute("SELECT COUNT(*) as n FROM articles") as cur:
             total_articles = (await cur.fetchone())["n"]
         async with db.execute(

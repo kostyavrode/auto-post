@@ -1,5 +1,6 @@
 import aiosqlite
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 DB_PATH = Path(os.getenv("DATA_DIR", "data")) / "db.sqlite3"
@@ -57,8 +58,9 @@ async def init_db() -> None:
         await db.commit()
 
 
-async def get_db() -> aiosqlite.Connection:
-    db = await aiosqlite.connect(DB_PATH)
-    db.row_factory = aiosqlite.Row
-    await db.execute("PRAGMA foreign_keys = ON")
-    return db
+@asynccontextmanager
+async def get_db():
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        await db.execute("PRAGMA foreign_keys = ON")
+        yield db

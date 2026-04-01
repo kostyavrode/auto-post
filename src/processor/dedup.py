@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 async def is_duplicate(url: str) -> bool:
     """Return True if the article URL was already stored."""
-    async with await get_db() as db:
+    async with get_db() as db:
         async with db.execute(
             "SELECT id FROM articles WHERE url = ?", (url,)
         ) as cursor:
@@ -23,7 +23,7 @@ async def save_article(article: RawArticle, lang: Optional[str] = None) -> Optio
     """
     Insert article into DB. Returns new row id, or None if duplicate.
     """
-    async with await get_db() as db:
+    async with get_db() as db:
         try:
             async with db.execute(
                 """
@@ -48,7 +48,7 @@ async def save_article(article: RawArticle, lang: Optional[str] = None) -> Optio
 
 
 async def update_image_path(article_id: int, image_path: str) -> None:
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.execute(
             "UPDATE articles SET image_path = ? WHERE id = ?",
             (image_path, article_id),
@@ -57,7 +57,7 @@ async def update_image_path(article_id: int, image_path: str) -> None:
 
 
 async def create_pending_post(article_id: int, generated_text: str) -> int:
-    async with await get_db() as db:
+    async with get_db() as db:
         async with db.execute(
             "INSERT INTO posts (article_id, generated_text, status) VALUES (?, ?, 'pending')",
             (article_id, generated_text),
@@ -68,7 +68,7 @@ async def create_pending_post(article_id: int, generated_text: str) -> int:
 
 
 async def mark_post_published(post_id: int) -> None:
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.execute(
             "UPDATE posts SET status='published', published_at=datetime('now') WHERE id=?",
             (post_id,),
@@ -77,7 +77,7 @@ async def mark_post_published(post_id: int) -> None:
 
 
 async def mark_post_failed(post_id: int, error: str) -> None:
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.execute(
             "UPDATE posts SET status='failed', error=? WHERE id=?",
             (error, post_id),
@@ -86,7 +86,7 @@ async def mark_post_failed(post_id: int, error: str) -> None:
 
 
 async def get_pending_posts(limit: int = 10) -> list:
-    async with await get_db() as db:
+    async with get_db() as db:
         async with db.execute(
             """
             SELECT p.id, p.generated_text, a.image_path, a.url, a.title
@@ -102,7 +102,7 @@ async def get_pending_posts(limit: int = 10) -> list:
 
 
 async def is_posting_enabled() -> bool:
-    async with await get_db() as db:
+    async with get_db() as db:
         async with db.execute(
             "SELECT value FROM settings WHERE key='posting_enabled'"
         ) as cursor:
@@ -111,7 +111,7 @@ async def is_posting_enabled() -> bool:
 
 
 async def set_posting_enabled(enabled: bool) -> None:
-    async with await get_db() as db:
+    async with get_db() as db:
         await db.execute(
             "INSERT OR REPLACE INTO settings (key, value) VALUES ('posting_enabled', ?)",
             ("1" if enabled else "0",),

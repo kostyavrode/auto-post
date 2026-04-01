@@ -41,7 +41,7 @@ def set_telethon_client(client) -> None:
 
 
 async def _load_sources() -> list:
-    async with await get_db() as db:
+    async with get_db() as db:
         async with db.execute(
             "SELECT id, name, type, url, channel, config_json, enabled FROM sources WHERE enabled=1"
         ) as cur:

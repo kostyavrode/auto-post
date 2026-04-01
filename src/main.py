@@ -32,7 +32,15 @@ def load_settings() -> dict:
 
 
 async def start_telethon():
-    """Start Telethon client if credentials are provided."""
+    """
+    Start Telethon client only if:
+    - API credentials are set in .env
+    - A session file already exists (created via the auth script)
+
+    Without an existing session, Telethon would ask for a phone number
+    interactively, which is impossible inside Docker.
+    Run the one-time auth script from README to create the session first.
+    """
     api_id = os.environ.get("TELEGRAM_API_ID")
     api_hash = os.environ.get("TELEGRAM_API_HASH")
 
@@ -40,12 +48,27 @@ async def start_telethon():
         logger.info("TELEGRAM_API_ID/HASH not set — Telegram channel sources disabled.")
         return None
 
+    session_path = Path(os.getenv("DATA_DIR", "data")) / "telethon_session"
+    session_file = session_path.with_suffix(".session")
+
+    if not session_file.exists():
+        logger.warning(
+            "Telethon session not found at %s. "
+            "Run the one-time auth script from README.md to enable Telegram sources.",
+            session_file,
+        )
+        return None
+
     try:
         from telethon import TelegramClient
 
-        session_path = Path(os.getenv("DATA_DIR", "data")) / "telethon_session"
         client = TelegramClient(str(session_path), int(api_id), api_hash)
-        await client.start()
+        # connect=True but no_updates=False; won't prompt for phone — session already exists
+        await client.connect()
+        if not await client.is_user_authorized():
+            logger.warning("Telethon session exists but is not authorized. Re-run auth script.")
+            await client.disconnect()
+            return None
         logger.info("Telethon client started.")
         set_telethon_client(client)
         return client

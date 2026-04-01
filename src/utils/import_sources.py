@@ -25,7 +25,7 @@ async def import_sources_from_config() -> None:
     if not sources:
         return
 
-    async with await get_db() as db:
+    async with get_db() as db:
         for src in sources:
             src_type = src.get("type", "rss")
             name = src.get("name", "")
