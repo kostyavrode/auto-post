@@ -116,7 +116,8 @@ async def fetch_all_sources() -> None:
                 )
             except Exception as exc:
                 logger.error("Generation failed for %s: %s", article.url, exc)
-                post_text = f"<b>{translated_title}</b>\n\n{translated_body[:500]}"
+                # Fallback: use full article body (Telegram message limit is 4096 chars)
+                post_text = f"<b>{translated_title}</b>\n\n{translated_body}\n\n{article.url}"
 
             await create_pending_post(article_id, post_text)
             logger.info("Queued article: %s", article.url)

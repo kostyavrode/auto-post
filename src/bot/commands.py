@@ -56,7 +56,9 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/del_example <filename> — delete an example\n\n"
         "Control:\n"
         "/run_now — fetch news and publish right now\n"
-        "/retry_failed — retry all failed posts\n"
+        "/retry_failed — retry failed posts (keep text)\n"
+        "/reset_posts [all] — reset failed posts with full article text\n"
+        "/regenerate — re-generate text for pending posts via AI\n"
         "/pause — pause auto-posting\n"
         "/resume — resume auto-posting\n"
         "/status — statistics\n"
@@ -279,8 +281,53 @@ async def cmd_queue(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 @admin_only
+async def cmd_regenerate(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Re-generate post text for all pending posts using Deepseek."""
+    from src.processor.generator import generate_post
+
+    msg = update.effective_message
+    await msg.reply_text("Re-generating posts with AI, please wait…")
+
+    async with get_db() as db:
+        async with db.execute(
+            """SELECT p.id, a.title, a.body, a.url
+               FROM posts p JOIN articles a ON a.id = p.article_id
+               WHERE p.status = 'pending'"""
+        ) as cur:
+            rows = await cur.fetchall()
+
+    if not rows:
+        await msg.reply_text("No pending posts to regenerate.")
+        return
+
+    ok, fail = 0, 0
+    for row in rows:
+        try:
+            new_text = await generate_post(
+                title=row["title"] or "",
+                body=row["body"] or "",
+                source_url=row["url"] or "",
+            )
+            async with get_db() as db:
+                await db.execute(
+                    "UPDATE posts SET generated_text=? WHERE id=?",
+                    (new_text, row["id"]),
+                )
+                await db.commit()
+            ok += 1
+        except Exception as exc:
+            logger.warning("Regeneration failed for post %s: %s", row["id"], exc)
+            fail += 1
+
+    await msg.reply_text(
+        f"Done. Regenerated: {ok}, failed: {fail}.\n"
+        "Use /run_now to publish."
+    )
+
+
+@admin_only
 async def cmd_retry_failed(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Reset all failed posts back to pending so they get retried."""
+    """Reset failed posts back to pending (keep existing generated text)."""
     msg = update.effective_message
     async with get_db() as db:
         async with db.execute(
@@ -297,7 +344,60 @@ async def cmd_retry_failed(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await msg.reply_text(
         f"Reset {count} failed post(s) to pending.\n"
-        "Use /run_now to publish them immediately."
+        "Use /run_now to publish them."
+    )
+
+
+@admin_only
+async def cmd_reset_posts(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Reset ALL non-published posts (failed + pending) to pending,
+    and rebuild their text from the original article body.
+    Useful when posts got truncated or AI was unavailable.
+
+    Usage:
+      /reset_posts          — reset failed posts only
+      /reset_posts all      — reset failed + already-pending posts too
+    """
+    msg = update.effective_message
+    args = context.args or []
+    include_pending = "all" in args
+
+    statuses = ("'failed'", "'pending'") if include_pending else ("'failed'",)
+    status_filter = f"status IN ({','.join(statuses)})"
+
+    async with get_db() as db:
+        async with db.execute(
+            f"SELECT COUNT(*) as n FROM posts WHERE {status_filter}"
+        ) as cur:
+            count = (await cur.fetchone())["n"]
+
+        if count == 0:
+            await msg.reply_text("No posts to reset.")
+            return
+
+        # Rebuild generated_text from article: full title + body + source url
+        await db.execute(f"""
+            UPDATE posts SET
+                status = 'pending',
+                error  = NULL,
+                generated_text = (
+                    SELECT
+                        '<b>' || COALESCE(a.title, '') || '</b>'
+                        || char(10) || char(10)
+                        || COALESCE(a.body, '')
+                        || char(10) || char(10)
+                        || COALESCE(a.url, '')
+                    FROM articles a WHERE a.id = posts.article_id
+                )
+            WHERE {status_filter}
+        """)
+        await db.commit()
+
+    scope = "failed + pending" if include_pending else "failed"
+    await msg.reply_text(
+        f"Reset {count} post(s) ({scope}) with full article text.\n"
+        "Use /run_now to publish, or /regenerate to re-process with AI first."
     )
 
 
@@ -337,6 +437,8 @@ def build_application(token: str) -> Application:
     app.add_handler(CommandHandler("queue", cmd_queue))
     app.add_handler(CommandHandler("run_now", cmd_run_now))
     app.add_handler(CommandHandler("retry_failed", cmd_retry_failed))
+    app.add_handler(CommandHandler("reset_posts", cmd_reset_posts))
+    app.add_handler(CommandHandler("regenerate", cmd_regenerate))
 
     # Catch plain text messages for example uploads
     app.add_handler(
