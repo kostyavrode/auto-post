@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  auto-post:
+    build: .
+    container_name: auto-post
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATA_DIR: /app/data
+      EXAMPLES_DIR: /app/examples
+      CONFIG_DIR: /app/config
+    volumes:
+      # Persistent data: SQLite DB and downloaded images
+      - ./data:/app/data
+      # Examples uploaded via bot are stored here permanently
+      - ./examples:/app/examples
+      # Config files (editable without rebuild)
+      - ./config:/app/config
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

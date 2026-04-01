@@ -1,0 +1,33 @@
+scheduler:
+  # How often to fetch news (in minutes)
+  interval_minutes: 30
+
+posting:
+  # Maximum posts published per scheduler run (0 = unlimited)
+  max_per_run: 5
+  # Minimum delay between posts in seconds
+  delay_between_posts: 10
+  # Whether posting is active (can be toggled via bot)
+  enabled: true
+
+llm:
+  model: "deepseek-chat"
+  base_url: "https://api.deepseek.com/v1"
+  max_tokens: 1024
+  temperature: 0.7
+
+translation:
+  # Translate articles that are NOT in target language
+  enabled: true
+
+images:
+  # Maximum image file size in MB to download
+  max_size_mb: 10
+  # Timeout in seconds for image download
+  timeout: 30
+
+scraper:
+  # Request timeout in seconds
+  timeout: 15
+  # User-Agent for HTTP requests
+  user_agent: "Mozilla/5.0 (compatible; NewsBot/1.0)"

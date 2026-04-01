@@ -1,0 +1,46 @@
+# News sources configuration
+# Add your sources here. Supported types: rss, scraper, telegram
+
+sources: []
+
+# ─── RSS (самый надёжный вариант) ───────────────────────────────
+# - name: "BBC News"
+#   type: rss
+#   url: "http://feeds.bbci.co.uk/news/rss.xml"
+#   enabled: true
+#
+# ─── Обычный сайт БЕЗ RSS — АВТО-режим ──────────────────────────
+# Просто укажи URL главной страницы или раздела новостей.
+# Система сама найдёт ссылки на статьи и извлечёт текст+картинки.
+#
+# - name: "Хабр"
+#   type: scraper
+#   url: "https://habr.com/ru/news/"
+#   enabled: true
+#   max_articles: 10        # сколько статей брать за раз (по умолчанию 10)
+#
+# - name: "Reuters"
+#   type: scraper
+#   url: "https://www.reuters.com/technology/"
+#   enabled: true
+#
+# ─── Обычный сайт — РУЧНОЙ режим (CSS-селекторы) ────────────────
+# Используй, если авто-режим плохо работает на конкретном сайте.
+# Открой сайт в браузере → правая кнопка → «Просмотреть код»
+# и найди нужные CSS-классы.
+#
+# - name: "Пример с селекторами"
+#   type: scraper
+#   url: "https://example.com/news"
+#   article_selector: "article.news-item"   # блок одной новости
+#   title_selector: "h2.title"              # заголовок внутри блока
+#   body_selector: "div.summary"            # текст превью
+#   link_selector: "a.read-more"            # ссылка на статью
+#   image_selector: "img.thumbnail"         # картинка
+#   enabled: true
+#
+# ─── Telegram-канал как источник ────────────────────────────────
+# - name: "Какой-то канал"
+#   type: telegram
+#   channel: "@somechannel"
+#   enabled: true
