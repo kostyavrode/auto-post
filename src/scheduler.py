@@ -27,6 +27,9 @@ from src.publisher.telegram import publish_post
 
 logger = logging.getLogger(__name__)
 
+# Prevents scheduler and /run_now from running concurrently
+_job_lock = asyncio.Lock()
+
 TARGET_LANG = os.environ.get("TARGET_LANGUAGE", "ru")
 LLM_MODEL = os.environ.get("LLM_MODEL", "deepseek-chat")
 MAX_PER_RUN = int(os.environ.get("MAX_PER_RUN", "5"))
@@ -149,10 +152,14 @@ async def publish_pending() -> None:
 
 async def run_job() -> None:
     """Main scheduled job: fetch new articles, then publish pending posts."""
-    logger.info("Starting scheduled job…")
-    await fetch_all_sources()
-    await publish_pending()
-    logger.info("Scheduled job complete.")
+    if _job_lock.locked():
+        logger.info("Job already running, skipping this trigger.")
+        return
+    async with _job_lock:
+        logger.info("Starting scheduled job…")
+        await fetch_all_sources()
+        await publish_pending()
+        logger.info("Scheduled job complete.")
 
 
 def create_scheduler(interval_minutes: int = 30) -> AsyncIOScheduler:
