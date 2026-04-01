@@ -31,7 +31,7 @@ def admin_only(func):
     """Decorator: only allow the admin user to run this command."""
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.effective_user and update.effective_user.id != ADMIN_ID:
-            await update.message.reply_text("Access denied.")
+            await update.effective_message.reply_text("Access denied.")
             return
         return await func(update, context)
     wrapper.__name__ = func.__name__
@@ -42,7 +42,7 @@ def admin_only(func):
 
 @admin_only
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
+    await update.effective_message.reply_text(
         "Auto News Poster bot.\n\n"
         "Sources:\n"
         "/add_source <url> [name] — add RSS or website\n"
@@ -56,6 +56,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/del_example <filename> — delete an example\n\n"
         "Control:\n"
         "/run_now — fetch news and publish right now\n"
+        "/retry_failed — retry all failed posts\n"
         "/pause — pause auto-posting\n"
         "/resume — resume auto-posting\n"
         "/status — statistics\n"
@@ -69,7 +70,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_add_source(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
     if not args:
-        await update.message.reply_text("Usage: /add_source <url> [name]")
+        await update.effective_message.reply_text("Usage: /add_source <url> [name]")
         return
 
     url = args[0]
@@ -83,7 +84,7 @@ async def cmd_add_source(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await db.commit()
 
-    await update.message.reply_text(
+    await update.effective_message.reply_text(
         f"Source added: {name}\nType: {src_type}\nURL: {url}"
     )
 
@@ -92,7 +93,7 @@ async def cmd_add_source(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_add_tg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
     if not args:
-        await update.message.reply_text("Usage: /add_tg <@channel> [name]")
+        await update.effective_message.reply_text("Usage: /add_tg <@channel> [name]")
         return
 
     channel = args[0]
@@ -105,7 +106,7 @@ async def cmd_add_tg(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await db.commit()
 
-    await update.message.reply_text(f"Telegram source added: {name} ({channel})")
+    await update.effective_message.reply_text(f"Telegram source added: {name} ({channel})")
 
 
 @admin_only
@@ -115,7 +116,7 @@ async def cmd_list_sources(update: Update, context: ContextTypes.DEFAULT_TYPE):
             rows = await cur.fetchall()
 
     if not rows:
-        await update.message.reply_text("No sources configured.")
+        await update.effective_message.reply_text("No sources configured.")
         return
 
     lines = []
@@ -124,38 +125,38 @@ async def cmd_list_sources(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target = r["url"] or r["channel"] or "—"
         lines.append(f"{status} [{r['id']}] {r['name']} ({r['type']})\n    {target}")
 
-    await update.message.reply_text("\n\n".join(lines))
+    await update.effective_message.reply_text("\n\n".join(lines))
 
 
 @admin_only
 async def cmd_del_source(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        await update.message.reply_text("Usage: /del_source <id>")
+        await update.effective_message.reply_text("Usage: /del_source <id>")
         return
     source_id = int(context.args[0])
     async with get_db() as db:
         await db.execute("DELETE FROM sources WHERE id=?", (source_id,))
         await db.commit()
-    await update.message.reply_text(f"Source {source_id} deleted.")
+    await update.effective_message.reply_text(f"Source {source_id} deleted.")
 
 
 @admin_only
 async def cmd_toggle_source(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        await update.message.reply_text("Usage: /toggle_source <id>")
+        await update.effective_message.reply_text("Usage: /toggle_source <id>")
         return
     source_id = int(context.args[0])
     async with get_db() as db:
         async with db.execute("SELECT enabled FROM sources WHERE id=?", (source_id,)) as cur:
             row = await cur.fetchone()
         if not row:
-            await update.message.reply_text(f"Source {source_id} not found.")
+            await update.effective_message.reply_text(f"Source {source_id} not found.")
             return
         new_val = 0 if row["enabled"] else 1
         await db.execute("UPDATE sources SET enabled=? WHERE id=?", (new_val, source_id))
         await db.commit()
     state = "enabled" if new_val else "disabled"
-    await update.message.reply_text(f"Source {source_id} is now {state}.")
+    await update.effective_message.reply_text(f"Source {source_id} is now {state}.")
 
 
 # ─────────────────────────── Examples ────────────────────────────
@@ -167,7 +168,7 @@ _awaiting_example: set = set()
 @admin_only
 async def cmd_upload_example(update: Update, context: ContextTypes.DEFAULT_TYPE):
     _awaiting_example.add(update.effective_user.id)
-    await update.message.reply_text(
+    await update.effective_message.reply_text(
         "Send your example post text as the next message (plain text, no commands)."
     )
 
@@ -178,9 +179,9 @@ async def handle_example_text(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
     _awaiting_example.discard(user_id)
 
-    text = update.message.text or ""
+    text = (update.effective_message.text if update.effective_message else "") or ""
     if not text.strip():
-        await update.message.reply_text("Empty text, example not saved.")
+        await update.effective_message.reply_text("Empty text, example not saved.")
         return
 
     EXAMPLES_DIR.mkdir(parents=True, exist_ok=True)
@@ -189,7 +190,7 @@ async def handle_example_text(update: Update, context: ContextTypes.DEFAULT_TYPE
     filename = f"example_{next_num:03d}.txt"
     (EXAMPLES_DIR / filename).write_text(text, encoding="utf-8")
 
-    await update.message.reply_text(f"Example saved as {filename} ({len(text)} chars).")
+    await update.effective_message.reply_text(f"Example saved as {filename} ({len(text)} chars).")
 
 
 @admin_only
@@ -197,28 +198,28 @@ async def cmd_list_examples(update: Update, context: ContextTypes.DEFAULT_TYPE):
     EXAMPLES_DIR.mkdir(parents=True, exist_ok=True)
     files = sorted(EXAMPLES_DIR.glob("*.txt"))
     if not files:
-        await update.message.reply_text("No examples loaded.")
+        await update.effective_message.reply_text("No examples loaded.")
         return
     lines = []
     for f in files:
         size = f.stat().st_size
         preview = f.read_text(encoding="utf-8")[:80].replace("\n", " ")
         lines.append(f"📄 {f.name} ({size}B)\n{preview}...")
-    await update.message.reply_text("\n\n".join(lines))
+    await update.effective_message.reply_text("\n\n".join(lines))
 
 
 @admin_only
 async def cmd_del_example(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        await update.message.reply_text("Usage: /del_example <filename>")
+        await update.effective_message.reply_text("Usage: /del_example <filename>")
         return
     filename = context.args[0]
     path = EXAMPLES_DIR / filename
     if path.exists() and path.suffix == ".txt":
         path.unlink()
-        await update.message.reply_text(f"Deleted {filename}.")
+        await update.effective_message.reply_text(f"Deleted {filename}.")
     else:
-        await update.message.reply_text(f"File not found: {filename}")
+        await update.effective_message.reply_text(f"File not found: {filename}")
 
 
 # ─────────────────────────── Control ────────────────────────────
@@ -226,13 +227,13 @@ async def cmd_del_example(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @admin_only
 async def cmd_pause(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await set_posting_enabled(False)
-    await update.message.reply_text("Auto-posting paused.")
+    await update.effective_message.reply_text("Auto-posting paused.")
 
 
 @admin_only
 async def cmd_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await set_posting_enabled(True)
-    await update.message.reply_text("Auto-posting resumed.")
+    await update.effective_message.reply_text("Auto-posting resumed.")
 
 
 @admin_only
@@ -255,7 +256,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
             active_sources = (await cur.fetchone())["n"]
 
     status_line = "✅ Running" if enabled else "⏸ Paused"
-    await update.message.reply_text(
+    await update.effective_message.reply_text(
         f"Status: {status_line}\n"
         f"Active sources: {active_sources}\n"
         f"Articles fetched: {total_articles}\n"
@@ -268,13 +269,36 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_queue(update: Update, context: ContextTypes.DEFAULT_TYPE):
     posts = await get_pending_posts(limit=5)
     if not posts:
-        await update.message.reply_text("No pending posts.")
+        await update.effective_message.reply_text("No pending posts.")
         return
     lines = []
     for p in posts:
         preview = (p["generated_text"] or "")[:100].replace("\n", " ")
         lines.append(f"[{p['id']}] {preview}...")
-    await update.message.reply_text("Pending posts (first 5):\n\n" + "\n\n".join(lines))
+    await update.effective_message.reply_text("Pending posts (first 5):\n\n" + "\n\n".join(lines))
+
+
+@admin_only
+async def cmd_retry_failed(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Reset all failed posts back to pending so they get retried."""
+    msg = update.effective_message
+    async with get_db() as db:
+        async with db.execute(
+            "SELECT COUNT(*) as n FROM posts WHERE status='failed'"
+        ) as cur:
+            count = (await cur.fetchone())["n"]
+
+        if count == 0:
+            await msg.reply_text("No failed posts to retry.")
+            return
+
+        await db.execute("UPDATE posts SET status='pending', error=NULL WHERE status='failed'")
+        await db.commit()
+
+    await msg.reply_text(
+        f"Reset {count} failed post(s) to pending.\n"
+        "Use /run_now to publish them immediately."
+    )
 
 
 @admin_only
@@ -282,13 +306,14 @@ async def cmd_run_now(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Manually trigger a full fetch + publish cycle right now."""
     from src.scheduler import run_job
 
-    await update.message.reply_text("Starting fetch cycle now, please wait…")
+    msg = update.effective_message
+    await msg.reply_text("Starting fetch cycle now, please wait…")
     try:
         await run_job()
-        await update.message.reply_text("Cycle complete. Use /status or /queue to see results.")
+        await msg.reply_text("Cycle complete. Use /status or /queue to see results.")
     except Exception as exc:
         logger.error("run_now error: %s", exc)
-        await update.message.reply_text(f"Error during cycle: {exc}")
+        await msg.reply_text(f"Error during cycle: {exc}")
 
 
 # ─────────────────────────── App builder ────────────────────────
@@ -311,6 +336,7 @@ def build_application(token: str) -> Application:
     app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(CommandHandler("queue", cmd_queue))
     app.add_handler(CommandHandler("run_now", cmd_run_now))
+    app.add_handler(CommandHandler("retry_failed", cmd_retry_failed))
 
     # Catch plain text messages for example uploads
     app.add_handler(
