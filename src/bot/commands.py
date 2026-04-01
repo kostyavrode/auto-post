@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -43,19 +44,22 @@ def admin_only(func):
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Auto News Poster bot.\n\n"
-        "Commands:\n"
-        "/add_source <url> [name] — add RSS or web source\n"
+        "Sources:\n"
+        "/add_source <url> [name] — add RSS or website\n"
         "/add_tg <@channel> [name] — add Telegram channel source\n"
         "/list_sources — list all sources\n"
         "/del_source <id> — remove source by ID\n"
-        "/toggle_source <id> — enable/disable source\n"
-        "/upload_example — reply to this, then send your example post text\n"
+        "/toggle_source <id> — enable/disable source\n\n"
+        "Examples:\n"
+        "/upload_example — upload a post style example\n"
         "/list_examples — show loaded examples\n"
-        "/del_example <filename> — delete an example\n"
+        "/del_example <filename> — delete an example\n\n"
+        "Control:\n"
+        "/run_now — fetch news and publish right now\n"
         "/pause — pause auto-posting\n"
         "/resume — resume auto-posting\n"
-        "/status — show statistics\n"
-        "/queue — show pending posts count\n"
+        "/status — statistics\n"
+        "/queue — pending posts\n"
     )
 
 
@@ -270,7 +274,21 @@ async def cmd_queue(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for p in posts:
         preview = (p["generated_text"] or "")[:100].replace("\n", " ")
         lines.append(f"[{p['id']}] {preview}...")
-    await update.message.reply_text(f"Pending posts (first 5):\n\n" + "\n\n".join(lines))
+    await update.message.reply_text("Pending posts (first 5):\n\n" + "\n\n".join(lines))
+
+
+@admin_only
+async def cmd_run_now(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Manually trigger a full fetch + publish cycle right now."""
+    from src.scheduler import run_job
+
+    await update.message.reply_text("Starting fetch cycle now, please wait…")
+    try:
+        await run_job()
+        await update.message.reply_text("Cycle complete. Use /status or /queue to see results.")
+    except Exception as exc:
+        logger.error("run_now error: %s", exc)
+        await update.message.reply_text(f"Error during cycle: {exc}")
 
 
 # ─────────────────────────── App builder ────────────────────────
@@ -292,6 +310,7 @@ def build_application(token: str) -> Application:
     app.add_handler(CommandHandler("resume", cmd_resume))
     app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(CommandHandler("queue", cmd_queue))
+    app.add_handler(CommandHandler("run_now", cmd_run_now))
 
     # Catch plain text messages for example uploads
     app.add_handler(
