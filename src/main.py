@@ -6,6 +6,7 @@ from pathlib import Path
 
 import yaml
 from dotenv import load_dotenv
+from telegram.error import NetworkError
 
 # Load .env before anything else
 load_dotenv()
@@ -97,23 +98,48 @@ async def main() -> None:
 
     logger.info("Starting Telegram bot…")
     token = os.environ["TELEGRAM_BOT_TOKEN"]
-    app = build_application(token)
+    max_attempts = max(1, int(os.environ.get("TELEGRAM_STARTUP_RETRIES", "5")))
 
-    async with app:
-        await app.start()
-        await app.updater.start_polling(drop_pending_updates=True)
-        logger.info("Bot is polling. Press Ctrl+C to stop.")
-
+    for attempt in range(1, max_attempts + 1):
+        app = build_application(token)
         try:
-            await asyncio.Event().wait()  # Block forever
-        except (KeyboardInterrupt, SystemExit):
-            pass
-        finally:
-            await app.updater.stop()
-            await app.stop()
-            scheduler.shutdown()
-            if telethon_client:
-                await telethon_client.disconnect()
+            async with app:
+                await app.start()
+                await app.updater.start_polling(drop_pending_updates=True)
+                logger.info("Bot is polling. Press Ctrl+C to stop.")
+
+                try:
+                    await asyncio.Event().wait()  # Block forever
+                except (KeyboardInterrupt, SystemExit):
+                    pass
+                finally:
+                    await app.updater.stop()
+                    await app.stop()
+                    scheduler.shutdown()
+                    if telethon_client:
+                        await telethon_client.disconnect()
+            break
+        except NetworkError as exc:
+            if attempt >= max_attempts:
+                logger.error(
+                    "Telegram API unreachable after %d attempts (%s). "
+                    "Check outbound HTTPS to api.telegram.org, DNS, and firewall.",
+                    max_attempts,
+                    exc,
+                )
+                scheduler.shutdown()
+                if telethon_client:
+                    await telethon_client.disconnect()
+                raise
+            wait_s = min(60.0, 5.0 * attempt)
+            logger.warning(
+                "Telegram startup failed: %s — retry %d/%d in %.0fs…",
+                exc,
+                attempt,
+                max_attempts,
+                wait_s,
+            )
+            await asyncio.sleep(wait_s)
 
 
 if __name__ == "__main__":
