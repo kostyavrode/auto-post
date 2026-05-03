@@ -21,6 +21,9 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)],
 )
+# Avoid logging full Bot API URLs (they contain the bot token in the path).
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
@@ -79,6 +82,13 @@ async def start_telethon():
 
 
 async def main() -> None:
+    admin_raw = os.environ.get("ADMIN_TELEGRAM_ID", "").strip()
+    if not admin_raw or admin_raw == "0":
+        logger.warning(
+            "ADMIN_TELEGRAM_ID is missing or 0 — /start will show your user id; "
+            "set it in .env to your numeric Telegram id and restart, then other commands work."
+        )
+
     settings = load_settings()
     interval = settings.get("scheduler", {}).get("interval_minutes", 30)
 

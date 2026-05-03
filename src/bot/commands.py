@@ -41,30 +41,57 @@ def admin_only(func):
 
 # ─────────────────────────── /start ────────────────────────────
 
-@admin_only
+_START_HELP = (
+    "Auto News Poster bot.\n\n"
+    "Sources:\n"
+    "/add_source <url> [name] — add RSS or website\n"
+    "/add_tg <@channel> [name] — add Telegram channel source\n"
+    "/list_sources — list all sources\n"
+    "/del_source <id> — remove source by ID\n"
+    "/toggle_source <id> — enable/disable source\n\n"
+    "Examples:\n"
+    "/upload_example — upload a post style example\n"
+    "/list_examples — show loaded examples\n"
+    "/del_example <filename> — delete an example\n\n"
+    "Control:\n"
+    "/run_now — fetch news and publish right now\n"
+    "/retry_failed — retry failed posts (keep text)\n"
+    "/reset_posts [all] — reset failed posts with full article text\n"
+    "/regenerate — re-generate text for pending posts via AI\n"
+    "/pause — pause auto-posting\n"
+    "/resume — resume auto-posting\n"
+    "/status — statistics\n"
+    "/queue — pending posts\n"
+)
+
+
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.effective_message.reply_text(
-        "Auto News Poster bot.\n\n"
-        "Sources:\n"
-        "/add_source <url> [name] — add RSS or website\n"
-        "/add_tg <@channel> [name] — add Telegram channel source\n"
-        "/list_sources — list all sources\n"
-        "/del_source <id> — remove source by ID\n"
-        "/toggle_source <id> — enable/disable source\n\n"
-        "Examples:\n"
-        "/upload_example — upload a post style example\n"
-        "/list_examples — show loaded examples\n"
-        "/del_example <filename> — delete an example\n\n"
-        "Control:\n"
-        "/run_now — fetch news and publish right now\n"
-        "/retry_failed — retry failed posts (keep text)\n"
-        "/reset_posts [all] — reset failed posts with full article text\n"
-        "/regenerate — re-generate text for pending posts via AI\n"
-        "/pause — pause auto-posting\n"
-        "/resume — resume auto-posting\n"
-        "/status — statistics\n"
-        "/queue — pending posts\n"
-    )
+    """
+    /start and /help: always reply (so misconfigured ADMIN_TELEGRAM_ID is obvious).
+    Full command list only for the configured admin.
+    """
+    msg = update.effective_message
+    if not msg:
+        return
+    uid = update.effective_user.id if update.effective_user else None
+
+    if ADMIN_ID == 0:
+        await msg.reply_text(
+            "ADMIN_TELEGRAM_ID is not set in .env.\n\n"
+            f"Your Telegram user id: {uid}\n"
+            "Add this number as ADMIN_TELEGRAM_ID, restart the container, then use /start again."
+        )
+        return
+
+    if uid != ADMIN_ID:
+        await msg.reply_text(
+            "This bot is restricted to the configured admin only.\n\n"
+            f"Your Telegram user id: {uid}\n"
+            "If this is your server, set ADMIN_TELEGRAM_ID in .env to this number and restart."
+        )
+        return
+
+    await msg.reply_text(_START_HELP)
 
 
 # ─────────────────────────── Sources ────────────────────────────
