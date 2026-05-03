@@ -7,6 +7,8 @@ from telegram import Bot
 from telegram.constants import ParseMode
 from telegram.error import TelegramError
 
+from src.telegram_http import build_telegram_http_request
+
 logger = logging.getLogger(__name__)
 
 CHANNEL_ID = os.environ.get("TELEGRAM_CHANNEL_ID", "")
@@ -36,7 +38,10 @@ async def publish_post(
         logger.error("TELEGRAM_CHANNEL_ID is not set")
         return False
 
-    bot = Bot(token=os.environ["TELEGRAM_BOT_TOKEN"])
+    bot = Bot(
+        token=os.environ["TELEGRAM_BOT_TOKEN"],
+        request=build_telegram_http_request(),
+    )
     has_image = bool(image_path and Path(image_path).exists())
 
     try:

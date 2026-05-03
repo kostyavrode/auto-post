@@ -13,9 +13,9 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
-from telegram.request import HTTPXRequest
 
 from src.db.models import get_db
+from src.telegram_http import build_telegram_http_request
 from src.processor.dedup import (
     get_pending_posts,
     is_posting_enabled,
@@ -420,17 +420,7 @@ async def cmd_run_now(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ─────────────────────────── App builder ────────────────────────
 
 def build_application(token: str) -> Application:
-    # Default PTB connect timeout is tight; slow routes to api.telegram.org need more.
-    connect = float(os.environ.get("TELEGRAM_HTTP_CONNECT_TIMEOUT", "30"))
-    read = float(os.environ.get("TELEGRAM_HTTP_READ_TIMEOUT", "60"))
-    write = float(os.environ.get("TELEGRAM_HTTP_WRITE_TIMEOUT", "60"))
-    pool = float(os.environ.get("TELEGRAM_HTTP_POOL_TIMEOUT", "10"))
-    request = HTTPXRequest(
-        connect_timeout=connect,
-        read_timeout=read,
-        write_timeout=write,
-        pool_timeout=pool,
-    )
+    request = build_telegram_http_request()
     app = Application.builder().token(token).request(request).build()
 
     app.add_handler(CommandHandler("start", cmd_start))
