@@ -23,7 +23,7 @@ def build_telegram_http_request() -> HTTPXRequest:
         or os.environ.get("HTTP_PROXY", "").strip()
         or None
     )
-    # Longer defaults when proxied; curl often works while httpx timed out on HTTP/2.
+    # Longer defaults when proxied (getUpdates needs a generous read timeout).
     if proxy_url:
         default_connect, default_read = "60", "180"
     else:
@@ -32,9 +32,6 @@ def build_telegram_http_request() -> HTTPXRequest:
     read = float(os.environ.get("TELEGRAM_HTTP_READ_TIMEOUT", default_read))
     write = float(os.environ.get("TELEGRAM_HTTP_WRITE_TIMEOUT", "60"))
     pool = float(os.environ.get("TELEGRAM_HTTP_POOL_TIMEOUT", "10"))
-    httpx_args = None
-    if proxy_url and os.environ.get("TELEGRAM_HTTP_HTTP2", "0") != "1":
-        httpx_args = {"http2": False}
     if not _logged_proxy:
         _logged_proxy = True
         if proxy_url:
@@ -42,11 +39,13 @@ def build_telegram_http_request() -> HTTPXRequest:
             host = u.hostname or "?"
             port = f":{u.port}" if u.port else ""
             logger.info(
-                "Telegram Bot API: using HTTP proxy %s://%s%s (credentials hidden)%s",
+                "Telegram Bot API: using HTTP proxy %s://%s%s "
+                "(connect=%ss read=%ss)",
                 u.scheme or "http",
                 host,
                 port,
-                ", HTTP/1.1 only (http2 disabled)" if httpx_args else "",
+                connect,
+                read,
             )
         else:
             logger.info(
@@ -59,5 +58,4 @@ def build_telegram_http_request() -> HTTPXRequest:
         write_timeout=write,
         pool_timeout=pool,
         proxy_url=proxy_url,
-        httpx_args=httpx_args,
     )
