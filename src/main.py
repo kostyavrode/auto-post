@@ -121,7 +121,7 @@ async def main() -> None:
                 await app.start()
                 await app.bot.delete_webhook(drop_pending_updates=True)
                 try:
-                    probe = await app.bot.get_updates(timeout=0, limit=1)
+                    probe = await app.bot.get_updates(timeout=0, limit=1, read_timeout=30)
                     logger.info("getUpdates probe OK (pending in queue: %d)", len(probe))
                 except Exception as exc:
                     logger.warning(
