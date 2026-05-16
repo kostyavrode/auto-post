@@ -119,7 +119,14 @@ async def main() -> None:
         try:
             async with app:
                 await app.start()
-                poll_timeout = int(os.environ.get("TELEGRAM_GET_UPDATES_TIMEOUT", "10"))
+                await app.bot.delete_webhook(drop_pending_updates=True)
+                # Short polling (timeout=0) works better through HTTP proxies than long poll.
+                default_poll_timeout = (
+                    "0" if os.environ.get("TELEGRAM_PROXY_URL", "").strip() else "10"
+                )
+                poll_timeout = int(
+                    os.environ.get("TELEGRAM_GET_UPDATES_TIMEOUT", default_poll_timeout)
+                )
                 poll_interval = float(os.environ.get("TELEGRAM_POLL_INTERVAL", "1"))
                 await app.updater.start_polling(
                     drop_pending_updates=True,
@@ -130,6 +137,14 @@ async def main() -> None:
                     "Bot is polling (getUpdates timeout=%ss). Press Ctrl+C to stop.",
                     poll_timeout,
                 )
+                try:
+                    probe = await app.bot.get_updates(timeout=0, limit=1)
+                    logger.info("getUpdates probe OK (pending in queue: %d)", len(probe))
+                except Exception as exc:
+                    logger.error(
+                        "getUpdates probe failed — bot may not receive your messages: %s",
+                        exc,
+                    )
                 from src.scheduler import run_job
 
                 asyncio.create_task(run_job())

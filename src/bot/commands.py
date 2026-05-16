@@ -475,6 +475,46 @@ async def _log_incoming_update(update: Update, context: ContextTypes.DEFAULT_TYP
     )
 
 
+# Reply-keyboard and some clients send "/status" as plain text (no bot_command entity).
+# CommandHandler only sees real commands; this handler covers the rest.
+_TEXT_COMMANDS: dict[str, object] = {
+    "start": cmd_start,
+    "help": cmd_start,
+    "add_source": cmd_add_source,
+    "add_tg": cmd_add_tg,
+    "list_sources": cmd_list_sources,
+    "del_source": cmd_del_source,
+    "toggle_source": cmd_toggle_source,
+    "upload_example": cmd_upload_example,
+    "list_examples": cmd_list_examples,
+    "del_example": cmd_del_example,
+    "pause": cmd_pause,
+    "resume": cmd_resume,
+    "status": cmd_status,
+    "queue": cmd_queue,
+    "run_now": cmd_run_now,
+    "retry_failed": cmd_retry_failed,
+    "reset_posts": cmd_reset_posts,
+    "regenerate": cmd_regenerate,
+}
+
+
+async def dispatch_text_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    if not msg or not msg.text:
+        return
+    parts = msg.text.strip().split()
+    if not parts or not parts[0].startswith("/"):
+        return
+    name = parts[0].lstrip("/").split("@", 1)[0].lower()
+    handler = _TEXT_COMMANDS.get(name)
+    if not handler:
+        return
+    context.args = parts[1:]
+    logger.info("Text command (keyboard/menu): /%s args=%s", name, context.args)
+    await handler(update, context)
+
+
 async def _on_handler_error(update: object, context: ContextTypes.DEFAULT_TYPE):
     logger.exception("Telegram handler error", exc_info=context.error)
     if isinstance(update, Update) and update.effective_message:
@@ -510,6 +550,11 @@ def build_application(token: str) -> Application:
     app.add_handler(CommandHandler("retry_failed", cmd_retry_failed))
     app.add_handler(CommandHandler("reset_posts", cmd_reset_posts))
     app.add_handler(CommandHandler("regenerate", cmd_regenerate))
+
+    # Keyboard buttons often send "/status" without a command entity.
+    app.add_handler(
+        MessageHandler(filters.Regex(r"^/\S+") & ~filters.COMMAND, dispatch_text_command)
+    )
 
     # Catch plain text messages for example uploads
     app.add_handler(

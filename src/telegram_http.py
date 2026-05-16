@@ -17,16 +17,24 @@ _logged_proxy: bool = False
 
 def build_telegram_http_request() -> HTTPXRequest:
     global _logged_proxy
-    connect = float(os.environ.get("TELEGRAM_HTTP_CONNECT_TIMEOUT", "30"))
-    read = float(os.environ.get("TELEGRAM_HTTP_READ_TIMEOUT", "60"))
-    write = float(os.environ.get("TELEGRAM_HTTP_WRITE_TIMEOUT", "60"))
-    pool = float(os.environ.get("TELEGRAM_HTTP_POOL_TIMEOUT", "10"))
     proxy_url = (
         os.environ.get("TELEGRAM_PROXY_URL", "").strip()
         or os.environ.get("HTTPS_PROXY", "").strip()
         or os.environ.get("HTTP_PROXY", "").strip()
         or None
     )
+    # Longer defaults when proxied; curl often works while httpx timed out on HTTP/2.
+    if proxy_url:
+        default_connect, default_read = "60", "180"
+    else:
+        default_connect, default_read = "30", "60"
+    connect = float(os.environ.get("TELEGRAM_HTTP_CONNECT_TIMEOUT", default_connect))
+    read = float(os.environ.get("TELEGRAM_HTTP_READ_TIMEOUT", default_read))
+    write = float(os.environ.get("TELEGRAM_HTTP_WRITE_TIMEOUT", "60"))
+    pool = float(os.environ.get("TELEGRAM_HTTP_POOL_TIMEOUT", "10"))
+    httpx_args = None
+    if proxy_url and os.environ.get("TELEGRAM_HTTP_HTTP2", "0") != "1":
+        httpx_args = {"http2": False}
     if not _logged_proxy:
         _logged_proxy = True
         if proxy_url:
@@ -34,10 +42,11 @@ def build_telegram_http_request() -> HTTPXRequest:
             host = u.hostname or "?"
             port = f":{u.port}" if u.port else ""
             logger.info(
-                "Telegram Bot API: using HTTP proxy %s://%s%s (credentials hidden)",
+                "Telegram Bot API: using HTTP proxy %s://%s%s (credentials hidden)%s",
                 u.scheme or "http",
                 host,
                 port,
+                ", HTTP/1.1 only (http2 disabled)" if httpx_args else "",
             )
         else:
             logger.info(
@@ -50,4 +59,5 @@ def build_telegram_http_request() -> HTTPXRequest:
         write_timeout=write,
         pool_timeout=pool,
         proxy_url=proxy_url,
+        httpx_args=httpx_args,
     )
