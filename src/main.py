@@ -49,7 +49,11 @@ async def start_telethon():
     api_hash = os.environ.get("TELEGRAM_API_HASH")
 
     if not api_id or not api_hash:
-        logger.info("TELEGRAM_API_ID/HASH not set — Telegram channel sources disabled.")
+        logger.info(
+            "TELEGRAM_API_ID/HASH not set — Telethon disabled: "
+            "cannot read other Telegram channels as news sources. "
+            "The control bot and publishing to your channel still work."
+        )
         return None
 
     session_path = Path(os.getenv("DATA_DIR", "data")) / "telethon_session"

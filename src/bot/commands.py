@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from telegram import Update
+from telegram import KeyboardButton, ReplyKeyboardMarkup, Update
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -65,6 +65,17 @@ _START_HELP = (
     "/queue — pending posts\n"
 )
 
+# Reply keyboard sends the same /commands as text — works with existing CommandHandlers.
+_ADMIN_KEYBOARD = ReplyKeyboardMarkup(
+    [
+        [KeyboardButton("/status"), KeyboardButton("/queue")],
+        [KeyboardButton("/run_now"), KeyboardButton("/pause"), KeyboardButton("/resume")],
+        [KeyboardButton("/list_sources"), KeyboardButton("/help")],
+    ],
+    resize_keyboard=True,
+    is_persistent=True,
+)
+
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -93,7 +104,11 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    await msg.reply_text(_START_HELP)
+    await msg.reply_text(
+        _START_HELP
+        + "\n\nUse the keyboard below or type commands (must start with /).",
+        reply_markup=_ADMIN_KEYBOARD,
+    )
 
 
 # ─────────────────────────── Sources ────────────────────────────
