@@ -102,10 +102,10 @@ async def main() -> None:
     scheduler = create_scheduler(interval_minutes=interval)
     scheduler.start()
 
-    # Run the first fetch immediately on startup
-    from src.scheduler import run_job
-    asyncio.create_task(run_job())
-
+    logger.info(
+        "Configured admin Telegram user id: %s",
+        os.environ.get("ADMIN_TELEGRAM_ID", "NOT SET"),
+    )
     logger.info("Starting Telegram bot…")
     token = os.environ["TELEGRAM_BOT_TOKEN"]
     max_attempts = max(1, int(os.environ.get("TELEGRAM_STARTUP_RETRIES", "5")))
@@ -115,8 +115,20 @@ async def main() -> None:
         try:
             async with app:
                 await app.start()
-                await app.updater.start_polling(drop_pending_updates=True)
-                logger.info("Bot is polling. Press Ctrl+C to stop.")
+                poll_timeout = int(os.environ.get("TELEGRAM_GET_UPDATES_TIMEOUT", "10"))
+                poll_interval = float(os.environ.get("TELEGRAM_POLL_INTERVAL", "1"))
+                await app.updater.start_polling(
+                    drop_pending_updates=True,
+                    timeout=poll_timeout,
+                    poll_interval=poll_interval,
+                )
+                logger.info(
+                    "Bot is polling (getUpdates timeout=%ss). Press Ctrl+C to stop.",
+                    poll_timeout,
+                )
+                from src.scheduler import run_job
+
+                asyncio.create_task(run_job())
 
                 try:
                     await asyncio.Event().wait()  # Block forever

@@ -11,6 +11,7 @@ from telegram.ext import (
     CommandHandler,
     ContextTypes,
     MessageHandler,
+    TypeHandler,
     filters,
 )
 
@@ -74,6 +75,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not msg:
         return
     uid = update.effective_user.id if update.effective_user else None
+    logger.info("Command /start from user_id=%s (configured admin=%s)", uid, ADMIN_ID)
 
     if ADMIN_ID == 0:
         await msg.reply_text(
@@ -446,9 +448,34 @@ async def cmd_run_now(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ─────────────────────────── App builder ────────────────────────
 
+async def _log_incoming_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    msg = update.effective_message
+    text = (msg.text[:120] if msg and msg.text else "(no text)")
+    logger.info(
+        "Telegram update: user_id=%s chat_id=%s text=%r",
+        user.id if user else None,
+        update.effective_chat.id if update.effective_chat else None,
+        text,
+    )
+
+
+async def _on_handler_error(update: object, context: ContextTypes.DEFAULT_TYPE):
+    logger.exception("Telegram handler error", exc_info=context.error)
+    if isinstance(update, Update) and update.effective_message:
+        try:
+            await update.effective_message.reply_text(
+                f"Bot error: {context.error!s}"
+            )
+        except Exception:
+            logger.exception("Failed to send error reply to user")
+
+
 def build_application(token: str) -> Application:
     request = build_telegram_http_request()
     app = Application.builder().token(token).request(request).build()
+    app.add_error_handler(_on_handler_error)
+    app.add_handler(TypeHandler(Update, _log_incoming_update), group=-1)
 
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_start))
