@@ -32,7 +32,7 @@ _job_lock = asyncio.Lock()
 
 TARGET_LANG = os.environ.get("TARGET_LANGUAGE", "ru")
 LLM_MODEL = os.environ.get("LLM_MODEL", "deepseek-chat")
-LLM_MAX_TOKENS = int(os.environ.get("LLM_MAX_TOKENS", "2048"))
+LLM_MAX_TOKENS = int(os.environ.get("LLM_MAX_TOKENS", "4096"))
 MAX_PER_RUN = int(os.environ.get("MAX_PER_RUN", "5"))
 DELAY_BETWEEN_POSTS = int(os.environ.get("DELAY_BETWEEN_POSTS", "10"))
 

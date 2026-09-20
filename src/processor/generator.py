@@ -29,7 +29,7 @@ async def generate_post(
     body: str,
     source_url: str = "",
     model: str = "deepseek-chat",
-    max_tokens: int = 2048,
+    max_tokens: int = 4096,
     temperature: float = 0.7,
 ) -> str:
     """
