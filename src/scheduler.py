@@ -32,6 +32,7 @@ _job_lock = asyncio.Lock()
 
 TARGET_LANG = os.environ.get("TARGET_LANGUAGE", "ru")
 LLM_MODEL = os.environ.get("LLM_MODEL", "deepseek-chat")
+LLM_MAX_TOKENS = int(os.environ.get("LLM_MAX_TOKENS", "2048"))
 MAX_PER_RUN = int(os.environ.get("MAX_PER_RUN", "5"))
 DELAY_BETWEEN_POSTS = int(os.environ.get("DELAY_BETWEEN_POSTS", "10"))
 
@@ -116,6 +117,7 @@ async def fetch_all_sources() -> None:
                     body=translated_body,
                     source_url=article.url,
                     model=LLM_MODEL,
+                    max_tokens=LLM_MAX_TOKENS,
                 )
             except Exception as exc:
                 logger.error("Generation failed for %s: %s", article.url, exc)

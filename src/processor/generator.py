@@ -29,7 +29,7 @@ async def generate_post(
     body: str,
     source_url: str = "",
     model: str = "deepseek-chat",
-    max_tokens: int = 1024,
+    max_tokens: int = 2048,
     temperature: float = 0.7,
 ) -> str:
     """
@@ -75,7 +75,12 @@ async def generate_post(
             max_tokens=max_tokens,
             temperature=temperature,
         )
-        return response.choices[0].message.content.strip()
+        choice = response.choices[0]
+        if choice.finish_reason == "length":
+            logger.warning("Post truncated by max_tokens=%s: %s", max_tokens, title)
+        return choice.message.content.strip()
     except Exception as exc:
+        # Let the caller fall back to the full article text instead of
+        # silently publishing a 300-char stub.
         logger.error("Post generation error: %s", exc)
-        return f"<b>{title}</b>\n\n{body[:300]}..."
+        raise
